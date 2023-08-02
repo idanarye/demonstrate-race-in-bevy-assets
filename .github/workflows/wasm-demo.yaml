@@ -30,6 +30,7 @@ jobs:
           GITHUB_REPO: ${{ github.repository }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |-
+          cargo build --release --target wasm32-unknown-unknown
           mkdir demo
           for demowasm in $(cd target/wasm32-unknown-unknown/release; ls *.wasm | grep -v -); do
               wasm-bindgen target/wasm32-unknown-unknown/release/$demowasm --out-dir demo/ --target web
