@@ -30,10 +30,10 @@ jobs:
           GITHUB_REPO: ${{ github.repository }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |-
-          mkdir demos
-          for demowasm in $(cd target/wasm32-unknown-unknown/release/examples; ls *.wasm | grep -v -); do
-              wasm-bindgen target/wasm32-unknown-unknown/release/examples/$demowasm --out-dir demos/ --target web
-              cat > target/doc/demos/${demowasm%.*}.html <<EOF
+          mkdir demo
+          for demowasm in $(cd target/wasm32-unknown-unknown/release; ls *.wasm | grep -v -); do
+              wasm-bindgen target/wasm32-unknown-unknown/release/$demowasm --out-dir demo/ --target web
+              cat > demo/${demowasm%.*}.html <<EOF
           <html lang="en-us">
               <head>
                   <script type="module">
@@ -53,14 +53,14 @@ jobs:
           </html>
           EOF
           done &&
-          cp -R assets/ demos/
+          cp -R assets/ demo/
       - name: Add read permissions
         run: |-
-          chmod --recursive +r demos
+          chmod --recursive +r demo
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v1
         with:
-          path: demos
+          path: demo
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v2
