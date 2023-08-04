@@ -5,42 +5,85 @@
 #![allow(clippy::too_many_arguments, clippy::type_complexity)]
 
 use bevy::prelude::*;
-use bevy_egui::{egui, EguiContexts, EguiPlugin};
+use bevy::text::DEFAULT_FONT_HANDLE;
 
 fn main() {
     App::new()
-        .add_plugins((DefaultPlugins, EguiPlugin))
+        .add_plugins(DefaultPlugins)
         .add_systems(Startup, setup)
-        .add_systems(Update, (ui_system, populate_sprites))
+        .add_systems(Update, (ui_update_info, ui_handle_button, populate_sprites))
         .run();
 }
 
 #[derive(Component)]
 struct ReloadableSprite;
 
+#[derive(Component)]
+struct InfoText;
+
+#[derive(Component)]
+struct RecreateButton;
+
 fn setup(mut commands: Commands) {
     commands.spawn(Camera2dBundle::default());
     commands.spawn(ReloadableSprite);
+    commands
+        .spawn(NodeBundle {
+            style: Style {
+                flex_direction: FlexDirection::Column,
+                ..Default::default()
+            },
+            ..Default::default()
+        })
+        .with_children(|children| {
+            let text_style = TextStyle {
+                font: DEFAULT_FONT_HANDLE.typed(),
+                font_size: 32.0,
+                color: Color::BLACK,
+            };
+            children.spawn(InfoText).insert(TextBundle::from_sections([
+                TextSection::new("Entity: ", text_style.clone()),
+                TextSection::from_style(text_style.clone()),
+                TextSection::new("\nTexture: ", text_style.clone()),
+                TextSection::from_style(text_style.clone()),
+                TextSection::new("\nTexture Load Status: ", text_style.clone()),
+                TextSection::from_style(text_style.clone()),
+            ]));
+            children
+                .spawn(RecreateButton)
+                .insert(ButtonBundle::default())
+                .with_children(|children| {
+                    children.spawn(TextBundle::from_section("Recreate", text_style.clone()));
+                });
+        });
 }
 
-fn ui_system(
-    mut contexts: EguiContexts,
-    query: Query<(Entity, &Handle<Image>), With<ReloadableSprite>>,
+fn ui_update_info(
+    mut ui_query: Query<&mut Text, With<InfoText>>,
+    sprite_query: Query<(Entity, &Handle<Image>), With<ReloadableSprite>>,
     asset_server: Res<AssetServer>,
+) {
+    let mut text = ui_query.single_mut();
+    let Ok((entity, texture)) = sprite_query.get_single() else { return };
+    text.sections[1].value = format!("{entity:?}");
+    text.sections[3].value = format!("{texture:?}");
+    let load_state = asset_server.get_load_state(texture);
+    text.sections[5].value = format!("{load_state:?}");
+}
+
+fn ui_handle_button(
+    ui_query: Query<&Interaction, (Changed<Interaction>, With<RecreateButton>)>,
+    sprite_query: Query<Entity, With<ReloadableSprite>>,
     mut commands: Commands,
 ) {
-    egui::Window::new("UI").show(contexts.ctx_mut(), |ui| {
-        for (entity, texture) in query.iter() {
-            ui.label(format!("Entity: {entity:?}"));
-            ui.label(format!("Texture: {texture:?}"));
-            let load_state = asset_server.get_load_state(texture);
-            ui.label(format!("Texture Load Status: {load_state:?}"));
-            if ui.button("Recreate").clicked() {
-                commands.entity(entity).despawn_recursive();
-                commands.spawn(ReloadableSprite);
-            }
-        }
-    });
+    let Ok(interaction) = ui_query.get_single() else { return };
+    if *interaction != Interaction::Pressed {
+        return;
+    }
+    for entity in sprite_query.iter() {
+        commands.entity(entity).despawn_recursive();
+        commands.spawn(ReloadableSprite);
+    }
 }
 
 fn populate_sprites(
